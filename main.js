@@ -15,7 +15,7 @@ class Controller {
 		
 		this.init();
 		
-		model.sprite.src = "imgs/sprite.png";
+		model.sprite.src = "imgs/sprite-v2.png";
 		model.sprite.addEventListener("load", function(){
 			self.start();
 		})
@@ -52,12 +52,22 @@ class Model {
 		};
 		
 		self.gameScreenMap = [
-			"d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d"
+		  "s1","s2","s1","s1","s2","s2","s2","s1","s2","s2","s1","s1","s2","s2","s2","s1",
+		  "s1","s1","s2","s1","s2","s2","s1","s1","s1","s2","s1","s2","s1","s1","s1","s1",
+		  "s2","s1","s1","s1","s2","s1","s1","s1","s2","s1","s2","s1","s1","s2","s2","s1",
+		  "s2","s1","s1","s2","s1","s2","s1","s2","s2","s2","s1","s2","s1","s1","s1","s1",
+		  "s1","s1","s1","s1","s2","s1","s1","s2","s2","s2","s1","s1","s2","s1","s1","s1",
+		  "s1","s1","s1","s2","s1","s1","s2","s2","s2","s1","s2","s1","s1","s1","s1","s2",
+		  "s1","s2","s2","s2","s1","s1","s2","s1","s1","s1","s2","s2","s2","s1","s1","s2",
+		  "s1","s1","s2","s1","s1","s1","s1","s2","s2","s1","s2","s1","s1","s2","s1","s1",
+		  "d","d","d","d","d","d","d","d","d","d","d","d","d","d","d","d"
 		];
 		
-		self.spriteRects = [
-			new Rect(87, 376, 50, 70)	// dirt
-		];
+		self.spriteRects = {
+			"d": new Rect(87, 376, 50, 70),	// dirt,
+			"s1": new Rect(87, 450, 40, 40), // sky 1
+			"s2": new Rect(161, 450, 40, 40) // sky 2
+		}
 	}
 	
 	getGameCanvasDimensions(){
@@ -83,12 +93,12 @@ class View {
 	}
 	
 	renderGame(model){
-		for (var i=0;i<model.numColumns;i++) {
-			const obj = model.spriteRects[0];
-			this.buffer.drawImage(model.sprite, obj.x, obj.y, obj.width, obj.height, i * model.bufferCellWidth, model.bufferCellHeight * 8, model.bufferCellWidth, model.bufferCellHeight);			
+		for (var i=0;i<model.gameScreenMap.length;i++) {
+			const rect = model.spriteRects[model.gameScreenMap[i]];
+			this.buffer.drawImage(model.sprite, rect.x, rect.y, rect.width, rect.height, i * model.bufferCellWidth, (i % model.numColumns) * model.bufferCellHeight, model.bufferCellWidth, model.bufferCellHeight);			
 		}
 
-		this.context.drawImage(this.buffer, 0, 0, this.buffer.canvas.width, this.buffer.canvas.height, 0, 0, this.canvas.width, this.canvas.height);
+		this.context.drawImage(this.buffer.canvas, 0, 0, this.buffer.canvas.width, this.buffer.canvas.height, 0, 0, this.canvas.width, this.canvas.height);
 	}
 }
 
