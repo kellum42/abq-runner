@@ -1,5 +1,36 @@
 'use strict';
 
+class Player {
+	constructor(screen){ 
+		this.frames = [new Rect(190, 165, 50, 60), new Rect(315, 165, 50, 60), new Rect(440, 165, 50, 60), new Rect(440, 165, 50, 60), new Rect(440, 165, 50, 60), new Rect(315, 165, 50, 60)];
+		this.frameIndex = 0;
+		this.isJumping = false;
+		
+		this.width = this.x = screen.cell.width * 2;
+		
+		const frame = this.frames[0];
+		const height = this.width * (frame.height/frame.width);
+		
+		this.y = this.defaultY = screen.cell.height * (screen.rows - 1) - height;
+		this.y_velocity = 0;
+		
+		
+	}	
+	
+	frame(){
+		return this.frames[this.frameIndex];
+	}
+	
+	height(){
+		const f = this.frame();
+		return this.width * (f.height/f.width);
+	}
+	
+	moveToNextFrame(){
+		this.frameIndex = this.frameIndex === this.frames.length - 1 ? 0 : this.frameIndex + 1;
+	}
+}
+
 class Rect {
 	constructor(x, y, width, height) {
 		this.x = x;
@@ -10,12 +41,14 @@ class Rect {
 }
 
 class GameLogic {
-	constructor(){
+	constructor(player){
 		// store max score in local storage
-		this.frameRate = 1000/60
+		this.frameRate = 50; // in milliseconds
 		this.score = 0;
 		this.speed = 3;
 		this.gameTime = window.performance.now();
+		this.player = player;
+		this.newJump = false;
 	}
 	
 	getMaxScore(){
@@ -25,7 +58,28 @@ class GameLogic {
 	update(){
 		//	don't quite understand offset yet?
 		
-		this.score += this.speed;
+		this.speed += 0.001
+		this.score = this.speed;
+		
+		if (this.newJump && !this.player.isJumping) {
+			this.newJump = false;
+			this.player.isJumping = true;
+			this.player.y_velocity = -15;
+		} 
+		
+		if (this.player.isJumping) {
+			this.player.y_velocity += 2;
+			this.player.y += this.player.y_velocity;
+			
+			if (this.player.y >= this.player.defaultY) {
+				this.player.y = this.player.defaultY;
+				this.player.isJumping = false;
+			}
+			
+		} else {
+			
+			this.player.moveToNextFrame();	
+		}
 		
 	}	
 }
@@ -53,6 +107,12 @@ class Screen {
 		  "s1","s1","s2","s1","s1","s1","s1","s2","s2","s1","s2","s1","s1","s2","s1","s1",
 		  "d","d","d","d","d","d","d","d","d","d","d","d","d","d","d","d"
 		];
+		
+		self.frames = {
+			"d": new Rect(87, 376, 50, 70),	// dirt,50-70
+			"s1": new Rect(87, 450, 40, 40), // sky 1
+			"s2": new Rect(161, 450, 40, 40), // sky 2
+		}
 	}
 	
 	getActualDimensions(){
@@ -74,18 +134,39 @@ class Controller {
 		self.model = model;
 		self.view = view;
 		
-		this.init();
+		this.init(model);
 		
-		model.sprite.src = "imgs/sprite-v2.png";
 		model.sprite.addEventListener("load", function(){
-			self.start();
-		})
+			model.spriteReady = true;
+			if (model.spriteReady && model.playerSpriteReady) {
+				self.start();	
+			}
+		});
+		
+		model.playerSprite.addEventListener("load", function(){
+			model.playerSpriteReady = true;
+			if (model.spriteReady && model.playerSpriteReady) {
+				self.start();	
+			}
+		});
 	}
 	
-	init(){
-		this.view.resizeGameCanvas(this.model.screen.getActualDimensions());
-		this.view.buffer.canvas.height = this.model.screen.height;
-		this.view.buffer.canvas.width = this.model.screen.width;
+	init(model){
+		const self = this;
+		
+		model.sprite.src = "imgs/sprite-v2.png";
+		model.playerSprite.src = "imgs/ninja-sprite-v2.png";
+		
+		const dimensions = self.model.screen.getActualDimensions();
+		self.view.resizeGameCanvas(dimensions);
+		self.view.buffer.canvas.height = self.model.screen.height;
+		self.view.buffer.canvas.width = self.model.screen.width;
+		
+		//	add user interaction callbacks
+		window.document.addEventListener("touchstart", self.handleUserAcitivty);
+		window.document.addEventListener("touchend", self.handleUserAcitivty);
+		window.document.addEventListener("mousedown", self.handleUserAcitivty);
+		window.document.addEventListener("mouseup", self.handleUserAcitivty);
 	}
 	
 	start(){
@@ -93,24 +174,27 @@ class Controller {
 	}
 	
 	loop(timeStamp) {
-		console.log("here");
+		//	window.performance.now() is always just a little greater than timestamp
 		const self = window.controller;
-		var totalGameTime = self.model.logic.gameTime;
 		const frameRate = self.model.logic.frameRate;
 		
-		if (timeStamp >= totalGameTime + frameRate) {
-			if (timeStamp - totalGameTime >= frameRate * 4) {
-				self.model.logic.gameTime = totalGameTime = timeStamp;
+		if (timeStamp >= self.model.logic.gameTime + frameRate) {
+			if (timeStamp - self.model.logic.gameTime >= frameRate * 4) {
+				self.model.logic.gameTime = timeStamp;
 			}
 		
 			while (self.model.logic.gameTime < timeStamp) {
 				self.model.logic.gameTime += frameRate;
-				self.model.logic.update();
+ 				self.model.logic.update(); // updates game score
 				self.model.screen.scroll();
 			}
-			self.view.renderGame(self.model);
+			self.view.drawGame(self.model);
 		}
 		window.requestAnimationFrame(self.loop);
+	}
+	
+	handleUserAcitivty(e){
+		controller.model.logic.newJump = e.type === "mousedown" || e.type === "touchstart";
 	}
 }
 
@@ -118,9 +202,11 @@ class Model {
 	constructor(){
 		const self = this;
 		
-		
-		//self.cellSize = self.getGameCanvasDimensions().width / self.numColumns;
 		self.sprite = new Image();
+		self.playerSprite = new Image();
+		
+		var spriteReady = false;
+		var playerSpriteReady = false;
 		
 		//	game config data - this should be preferences that the user is able to save locally.
 		//	customize the game based off this config data.
@@ -128,14 +214,9 @@ class Model {
 			
 		};
 		
-		self.logic = new GameLogic();
-		self.screen = new Screen();
-		
-		self.spriteRects = {
-			"d": new Rect(87, 376, 50, 70),	// dirt,
-			"s1": new Rect(87, 450, 40, 40), // sky 1
-			"s2": new Rect(161, 450, 40, 40) // sky 2
-		}
+		self.screen = new Screen(); // drawing screen - smaller version of view
+		self.player = new Player(self.screen);
+		self.logic = new GameLogic(self.player);	
 	}
 }
 
@@ -155,11 +236,11 @@ class View {
 		
 	}
 	
-	renderGame(model){
+	drawGame(model){
 		
 		//	draw background (sky & dirt)
 		for (var i=0;i<model.screen.map.length;i++) {
-			const rect = model.spriteRects[model.screen.map[i]];
+			const rect = model.screen.frames[model.screen.map[i]];
 			this.buffer.drawImage(model.sprite, rect.x, rect.y, rect.width, rect.height, (i % model.screen.columns) * model.screen.cell.width, Math.floor(i / model.screen.columns) * model.screen.cell.height, model.screen.cell.width, model.screen.cell.height);
 		}
 		
@@ -168,6 +249,16 @@ class View {
 	    this.buffer.fillStyle = "#000000";
 	    this.buffer.fillText("0/1350", 5, 20);
 
+		//	draw player
+		const player = model.player;
+		const pf = player.frame();
+		
+		const playerWidth = model.screen.cell.width * 2;
+		const playerHeight = playerWidth * (pf.height/pf.width);
+		//this.buffer.drawImage(model.playerSprite, pf.x, pf.y, pf.width, pf.height, playerWidth, model.screen.cell.height * (model.screen.rows - 1) - playerHeight, playerWidth, playerHeight);
+		
+		this.buffer.drawImage(model.playerSprite, pf.x, pf.y, pf.width, pf.height, player.x, player.y, player.width, player.height());
+		
 		//	draw objects
 		
 		this.context.drawImage(this.buffer.canvas, 0, 0, this.buffer.canvas.width, this.buffer.canvas.height, 0, 0, this.canvas.width, this.canvas.height);
